@@ -8,8 +8,11 @@ gen() {
   mkdir -p ${NAME}
   echo "FROM php:${BASE}-apache" > ${NAME}/Dockerfile
   echo '' >> ${NAME}/Dockerfile
-  echo '# Install dependencies' >> ${NAME}/Dockerfile
+  echo '# Install dependencies and extensions' >> ${NAME}/Dockerfile
   echo 'RUN apt-get update && apt-get install -y --no-install-recommends git zlib1g-dev ca-certificates libpng-dev libzip-dev' >> ${NAME}/Dockerfile
+  echo 'RUN docker-php-ext-install pdo pdo_mysql mysqli' >> ${NAME}/Dockerfile
+  echo 'RUN docker-php-ext-install mbstring' >> ${NAME}/Dockerfile
+  echo 'RUN a2enmod rewrite' >> ${NAME}/Dockerfile
   echo '' >> ${NAME}/Dockerfile
   echo '# Harden php and apache' >> ${NAME}/Dockerfile
   echo 'RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"' >> ${NAME}/Dockerfile

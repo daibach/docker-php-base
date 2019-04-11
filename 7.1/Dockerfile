@@ -1,7 +1,10 @@
 FROM php:7.1-apache
 
-# Install dependencies
+# Install dependencies and extensions
 RUN apt-get update && apt-get install -y --no-install-recommends git zlib1g-dev ca-certificates libpng-dev libzip-dev
+RUN docker-php-ext-install pdo pdo_mysql mysqli
+RUN docker-php-ext-install mbstring
+RUN a2enmod rewrite
 
 # Harden php and apache
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
