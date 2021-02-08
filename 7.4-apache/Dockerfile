@@ -20,6 +20,6 @@ RUN { \
   && a2enmod rewrite \
   && a2disconf security \
 	&& a2enconf docker-harden \
-  && service apache2 restart \
+  && service apache2 restart
 
 
