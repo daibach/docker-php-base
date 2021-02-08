@@ -38,7 +38,4 @@ gen() {
   echo '' >> ${NAME}/Dockerfile
 }
 
-gen 7.1 7.1
-gen 7.2 7.2
-gen 7.3 7.3
 gen 7.4 7.4
