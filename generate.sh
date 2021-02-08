@@ -49,6 +49,9 @@ gen() {
   echo '' >> ${NAME}/Dockerfile
 }
 
-gen 7.4 7.4-apache apache
+gen 7.4 7.4-apache apache nocron
 gen 7.4 7.4-apache-cron apache cron
-gen 7.4 7.4-cli cli
+gen 7.4 7.4-cli cli nocron
+gen 8.0 8.0-apache apache nocron
+gen 8.0 8.0-apache-cron apache cron
+gen 8.0 8.0-cli cli nocron
