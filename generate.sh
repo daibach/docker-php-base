@@ -5,6 +5,7 @@ gen() {
   BASE=$1
   NAME=$2
   BASE_TYPE=$3
+  INCLUDE_CRON=$4
 
   mkdir -p ${NAME}
   echo "FROM php:${BASE}-${BASE_TYPE}" > ${NAME}/Dockerfile
@@ -38,8 +39,16 @@ gen() {
     echo '' >> ${NAME}/Dockerfile
   fi
 
+  if [ ${INCLUDE_CRON} == 'cron' ]; then
+    echo '# Install cron' >> ${NAME}/Dockerfile >> ${NAME}/Dockerfile
+    echo 'RUN apt-get -y install cron' >> ${NAME}/Dockerfile
+    echo 'RUN touch /var/log/cron.log' >> ${NAME}/Dockerfile
+    echo '' >> ${NAME}/Dockerfile
+  fi
+
   echo '' >> ${NAME}/Dockerfile
 }
 
 gen 7.4 7.4-apache apache
+gen 7.4 7.4-apache-cron apache cron
 gen 7.4 7.4-cli cli
