@@ -4,9 +4,10 @@ set -xe
 gen() {
   BASE=$1
   NAME=$2
+  BASE_TYPE=$3
 
   mkdir -p ${NAME}
-  echo "FROM php:${BASE}-apache" > ${NAME}/Dockerfile
+  echo "FROM php:${BASE}-${BASE_TYPE}" > ${NAME}/Dockerfile
   echo '' >> ${NAME}/Dockerfile
 
   echo '# Install dependencies' >> ${NAME}/Dockerfile
@@ -20,22 +21,25 @@ gen() {
   echo 'RUN sed -i -e 's/expose_php=on/expose_php=off/g' "$PHP_INI_DIR/php.ini"' >> ${NAME}/Dockerfile
   echo '' >> ${NAME}/Dockerfile
 
-  echo '# Harden Apache and enable modules' >> ${NAME}/Dockerfile
-  echo 'RUN { \' >> ${NAME}/Dockerfile
-  echo '		echo 'ServerTokens Prod'; \' >> ${NAME}/Dockerfile
-  echo '		echo 'ServerSignature Off'; \' >> ${NAME}/Dockerfile
-  echo '    echo 'TraceEnable Off'; \' >> ${NAME}/Dockerfile
-  echo '		echo 'Header always unset "X-Powered-By"'; \' >> ${NAME}/Dockerfile
-  echo '    echo 'Header unset "X-Powered-By"'; \' >> ${NAME}/Dockerfile
-  echo '  } | tee "$APACHE_CONFDIR/conf-available/docker-harden.conf" \' >> ${NAME}/Dockerfile
-  echo '  && a2enmod headers \' >> ${NAME}/Dockerfile
-  echo '  && a2enmod rewrite \' >> ${NAME}/Dockerfile
-  echo '  && a2disconf security \' >> ${NAME}/Dockerfile
-  echo '	&& a2enconf docker-harden \' >> ${NAME}/Dockerfile
-  echo '  && service apache2 restart \' >> ${NAME}/Dockerfile
-  echo '' >> ${NAME}/Dockerfile
+  if [ ${BASE_TYPE} == 'apache' ]; then
+    echo '# Harden Apache and enable modules' >> ${NAME}/Dockerfile
+    echo 'RUN { \' >> ${NAME}/Dockerfile
+    echo '		echo 'ServerTokens Prod'; \' >> ${NAME}/Dockerfile
+    echo '		echo 'ServerSignature Off'; \' >> ${NAME}/Dockerfile
+    echo '    echo 'TraceEnable Off'; \' >> ${NAME}/Dockerfile
+    echo '		echo 'Header always unset "X-Powered-By"'; \' >> ${NAME}/Dockerfile
+    echo '    echo 'Header unset "X-Powered-By"'; \' >> ${NAME}/Dockerfile
+    echo '  } | tee "$APACHE_CONFDIR/conf-available/docker-harden.conf" \' >> ${NAME}/Dockerfile
+    echo '  && a2enmod headers \' >> ${NAME}/Dockerfile
+    echo '  && a2enmod rewrite \' >> ${NAME}/Dockerfile
+    echo '  && a2disconf security \' >> ${NAME}/Dockerfile
+    echo '	&& a2enconf docker-harden \' >> ${NAME}/Dockerfile
+    echo '  && service apache2 restart \' >> ${NAME}/Dockerfile
+    echo '' >> ${NAME}/Dockerfile
+  fi
 
   echo '' >> ${NAME}/Dockerfile
 }
 
-gen 7.4 7.4
+gen 7.4 7.4-apache apache
+gen 7.4 7.4-cli cli
