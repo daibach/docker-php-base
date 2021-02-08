@@ -35,13 +35,13 @@ gen() {
     echo '  && a2enmod rewrite \' >> ${NAME}/Dockerfile
     echo '  && a2disconf security \' >> ${NAME}/Dockerfile
     echo '	&& a2enconf docker-harden \' >> ${NAME}/Dockerfile
-    echo '  && service apache2 restart \' >> ${NAME}/Dockerfile
+    echo '  && service apache2 restart' >> ${NAME}/Dockerfile
     echo '' >> ${NAME}/Dockerfile
   fi
 
   if [ ${INCLUDE_CRON} == 'cron' ]; then
     echo '# Install cron' >> ${NAME}/Dockerfile >> ${NAME}/Dockerfile
-    echo 'RUN apt-get -y install cron' >> ${NAME}/Dockerfile
+    echo 'RUN apt-get update && apt-get -y install cron' >> ${NAME}/Dockerfile
     echo 'RUN touch /var/log/cron.log' >> ${NAME}/Dockerfile
     echo '' >> ${NAME}/Dockerfile
   fi

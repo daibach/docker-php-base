@@ -20,10 +20,10 @@ RUN { \
   && a2enmod rewrite \
   && a2disconf security \
 	&& a2enconf docker-harden \
-  && service apache2 restart \
+  && service apache2 restart
 
 # Install cron
-RUN apt-get -y install cron
+RUN apt-get update && apt-get -y install cron
 RUN touch /var/log/cron.log
 
 
