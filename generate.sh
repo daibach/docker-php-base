@@ -41,7 +41,7 @@ gen() {
   fi
 
   if [ ${INCLUDE_CRON} == 'cron' ]; then
-    echo '# Install cron' >> ${NAME}/Dockerfile >> ${NAME}/Dockerfile
+    echo '# Install cron' >> ${NAME}/Dockerfile
     echo 'RUN apt-get update && apt-get -y install cron' >> ${NAME}/Dockerfile
     echo 'RUN touch /var/log/cron.log' >> ${NAME}/Dockerfile
     echo '' >> ${NAME}/Dockerfile
