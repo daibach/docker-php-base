@@ -6,6 +6,7 @@ gen() {
   NAME=$2
   BASE_TYPE=$3
   INCLUDE_CRON=$4
+  INCLUDE_COMPOSER=$5
 
   mkdir -p ${NAME}
   echo "FROM php:${BASE}-${BASE_TYPE}" > ${NAME}/Dockerfile
@@ -46,12 +47,18 @@ gen() {
     echo '' >> ${NAME}/Dockerfile
   fi
 
+  if [ ${INCLUDE_COMPOSER} == 'composer' ]; then
+    echo '# Install composer' >> ${NAME}/Dockerfile
+    echo 'RUN php -r "readfile('\''http://getcomposer.org/installer'\'');" | php -- --install-dir=/usr/bin/ --filename=composer' >> ${NAME}/Dockerfile
+    echo '' >> ${NAME}/Dockerfile
+  fi
+
   echo '' >> ${NAME}/Dockerfile
 }
 
 gen 7.4 7.4-apache apache nocron
 gen 7.4 7.4-apache-cron apache cron
 gen 7.4 7.4-cli cli nocron
-gen 8.0 8.0-apache apache nocron
-gen 8.0 8.0-apache-cron apache cron
-gen 8.0 8.0-cli cli nocron
+gen 8.0 8.0-apache apache nocron composer
+gen 8.0 8.0-apache-cron apache cron composer
+gen 8.0 8.0-cli cli nocron composer

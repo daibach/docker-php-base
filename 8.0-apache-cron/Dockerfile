@@ -26,4 +26,7 @@ RUN { \
 RUN apt-get update && apt-get -y install cron
 RUN touch /var/log/cron.log
 
+# Install composer
+RUN php -r "readfile('http://getcomposer.org/installer');" | php -- --install-dir=/usr/bin/ --filename=composer
+
 
