@@ -13,7 +13,7 @@ gen() {
   echo '' >> ${NAME}/Dockerfile
 
   echo '# Install dependencies' >> ${NAME}/Dockerfile
-  echo 'RUN apt-get update && apt-get install -y --no-install-recommends git zlib1g-dev ca-certificates libpng-dev libzip-dev libicu-dev' >> ${NAME}/Dockerfile
+  echo 'RUN apt-get update && apt-get install -y --no-install-recommends git zlib1g-dev ca-certificates libpng-dev libzip-dev libicu-dev zip unzip' >> ${NAME}/Dockerfile
   echo 'RUN docker-php-ext-install pdo pdo_mysql mysqli intl' >> ${NAME}/Dockerfile
 
   echo '' >> ${NAME}/Dockerfile

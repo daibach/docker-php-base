@@ -1,7 +1,7 @@
 FROM php:8.0-apache
 
 # Install dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends git zlib1g-dev ca-certificates libpng-dev libzip-dev libicu-dev
+RUN apt-get update && apt-get install -y --no-install-recommends git zlib1g-dev ca-certificates libpng-dev libzip-dev libicu-dev zip unzip
 RUN docker-php-ext-install pdo pdo_mysql mysqli intl
 
 # Harden PHP
