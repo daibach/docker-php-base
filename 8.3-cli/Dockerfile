@@ -1,8 +1,18 @@
 FROM php:8.3-cli
 
 # Install dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends git zlib1g-dev ca-certificates libpng-dev libzip-dev libicu-dev zip unzip
-RUN docker-php-ext-install pdo pdo_mysql mysqli intl
+RUN apt-get update && apt-get install -y --no-install-recommends \ 
+   git \
+   zlib1g-dev \
+   ca-certificates \
+   cron \
+   libpng-dev \
+   libzip-dev \
+   libicu-dev \
+   zip \
+   unzip \
+   && rm -rf /var/lib/apt/lists/* \
+   docker-php-ext-install pdo pdo_mysql mysqli intl
 
 # Harden PHP
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
