@@ -17,6 +17,7 @@ gen() {
   echo '   git \' >> ${NAME}/Dockerfile
   echo '   zlib1g-dev \' >> ${NAME}/Dockerfile
   echo '   ca-certificates \' >> ${NAME}/Dockerfile
+  echo '   cron \' >> ${NAME}/Dockerfile
   echo '   libpng-dev \' >> ${NAME}/Dockerfile
   echo '   libzip-dev \' >> ${NAME}/Dockerfile
   echo '   libicu-dev \' >> ${NAME}/Dockerfile
@@ -50,7 +51,6 @@ gen() {
 
   if [ ${INCLUDE_CRON} == 'cron' ]; then
     echo '# Install cron' >> ${NAME}/Dockerfile
-    echo 'RUN apt-get update && apt-get -y install cron' >> ${NAME}/Dockerfile
     echo 'RUN touch /var/log/cron.log' >> ${NAME}/Dockerfile
     echo '' >> ${NAME}/Dockerfile
   fi
