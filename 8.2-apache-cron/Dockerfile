@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
    zip \
    unzip \
    && rm -rf /var/lib/apt/lists/* \
-   docker-php-ext-install pdo pdo_mysql mysqli intl
+   && docker-php-ext-install pdo pdo_mysql mysqli intl
 
 # Harden PHP
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"

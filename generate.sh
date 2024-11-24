@@ -24,7 +24,7 @@ gen() {
   echo '   zip \' >> ${NAME}/Dockerfile
   echo '   unzip \' >> ${NAME}/Dockerfile
   echo '   && rm -rf /var/lib/apt/lists/* \' >> ${NAME}/Dockerfile
-  echo '   docker-php-ext-install pdo pdo_mysql mysqli intl' >> ${NAME}/Dockerfile
+  echo '   && docker-php-ext-install pdo pdo_mysql mysqli intl' >> ${NAME}/Dockerfile
   echo '' >> ${NAME}/Dockerfile
 
   echo '# Harden PHP' >> ${NAME}/Dockerfile
