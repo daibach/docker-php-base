@@ -76,3 +76,6 @@ gen 8.2 8.2-cli cli nocron composer
 gen 8.3 8.3-apache apache nocron composer
 gen 8.3 8.3-apache-cron apache cron composer
 gen 8.3 8.3-cli cli nocron composer
+gen 8.4 8.4-apache apache nocron composer
+gen 8.4 8.4-apache-cron apache cron composer
+gen 8.4 8.4-cli cli nocron composer
