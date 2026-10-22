@@ -1,7 +1,12 @@
-FROM php:8.3-apache
+# Legacy mod_php images: cedyrn/php-parent:<minor>-apache, -apache-cron and -cli.
+# Built with --target apache|apache-cron|cli. To be retired once apps move to the new image.
+ARG PHP_VERSION
+ARG BASE_TYPE
+
+FROM php:${PHP_VERSION}-${BASE_TYPE} AS common
 
 # Install dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \ 
+RUN apt-get update && apt-get install -y --no-install-recommends \
    git \
    zlib1g-dev \
    ca-certificates \
@@ -18,6 +23,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 RUN sed -i -e s/expose_php=on/expose_php=off/g "$PHP_INI_DIR/php.ini"
 
+
+FROM common AS cli
+
+# Install composer
+RUN php -r "readfile('http://getcomposer.org/installer');" | php -- --install-dir=/usr/bin/ --filename=composer
+
+
+FROM common AS apache
+
 # Harden Apache and enable modules
 RUN { \
 		echo ServerTokens Prod; \
@@ -32,10 +46,11 @@ RUN { \
 	&& a2enconf docker-harden \
   && service apache2 restart
 
-# Install cron
-RUN touch /var/log/cron.log
-
 # Install composer
 RUN php -r "readfile('http://getcomposer.org/installer');" | php -- --install-dir=/usr/bin/ --filename=composer
 
 
+FROM apache AS apache-cron
+
+# Install cron
+RUN touch /var/log/cron.log

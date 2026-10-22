@@ -1,9 +1,10 @@
 #!/bin/sh
 # Basic checks run against each image before it is pushed.
-# Usage: tests/smoke-test.sh <image>
+# Usage: tests/smoke-test.sh <image> [expected PHP version]
 set -eu
 
 IMAGE=$1
+EXPECTED_VERSION=${2:-}
 CONTAINER=php-parent-smoke-$$
 PORT=${SMOKE_PORT:-8080}
 
@@ -18,6 +19,10 @@ run() {
 
 echo "== PHP version"
 run php -v
+if [ -n "$EXPECTED_VERSION" ]; then
+  VERSION=$(run php -r 'echo PHP_VERSION;')
+  [ "$VERSION" = "$EXPECTED_VERSION" ] || fail "PHP $VERSION, expected $EXPECTED_VERSION"
+fi
 
 echo "== PHP extensions"
 MODULES=$(run php -m)

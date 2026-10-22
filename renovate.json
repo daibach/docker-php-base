@@ -1,0 +1,45 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "description": "PHP versions in versions.json, looked up as php image tags on Docker Hub",
+      "customType": "regex",
+      "managerFilePatterns": ["/^versions\\.json$/"],
+      "matchStrings": ["\"\\d+\\.\\d+\":\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+      "depNameTemplate": "php",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Offer patch updates separately, otherwise only the latest minor is proposed",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["php"],
+      "separateMinorPatch": true
+    },
+    {
+      "description": "New PHP minor/major versions are added to versions.json by hand",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["php"],
+      "matchUpdateTypes": ["minor", "major"],
+      "enabled": false
+    },
+    {
+      "description": "Auto-merge PHP patch releases once all upstream variants have had time to publish",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["php"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "PHP patch versions",
+      "minimumReleaseAge": "1 hour",
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge non-major GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true
+    }
+  ]
+}
