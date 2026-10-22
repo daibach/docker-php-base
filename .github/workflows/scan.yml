@@ -4,10 +4,21 @@ on:
   schedule:
     # Daily, to catch vulnerabilities disclosed since the images were built
     - cron: "0 5 * * *"
+  # After every build that publishes images, so results match what was just
+  # published
+  workflow_run:
+    workflows: [Build images]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# A newer scan supersedes one still running
+concurrency:
+  group: scan
+  cancel-in-progress: true
 
 env:
   IMAGE: cedyrn/php-parent
@@ -15,6 +26,14 @@ env:
 jobs:
   matrix:
     name: Scan matrix
+    # After a build, only scan when it published: a successful build of main
+    # in this repository, not a pull request
+    if: >-
+      github.event_name != 'workflow_run' || (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event != 'pull_request' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     runs-on: ubuntu-latest
     outputs:
       versions: ${{ steps.versions.outputs.versions }}

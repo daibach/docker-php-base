@@ -158,7 +158,7 @@ The PHP-FPM image is scanned with [Trivy](https://trivy.dev/). Only vulnerabilit
 | When | What | Results |
 |---|---|---|
 | Every build | The image just built, for each architecture | HIGH and CRITICAL findings in the job summary |
-| Daily (05:00 UTC, `.github/workflows/scan.yml`) | The published tag for each PHP version (amd64) | All findings in the repository's Security tab, plus HIGH and CRITICAL in the job summary |
+| After each build that publishes, and daily at 05:00 UTC (`.github/workflows/scan.yml`) | The published tag for each PHP version (amd64) | All findings in the repository's Security tab, plus HIGH and CRITICAL in the job summary |
 
 Alerts in the Security tab close automatically once a scan no longer finds them. Most findings are fixed by a rebuild (the weekly build, or Actions → Build images → Run workflow) or by updating s6-overlay or supercronic. A vulnerability in a Debian package with no fix is not reported until Debian releases one.
 
