@@ -18,6 +18,8 @@ concurrency:
 
 env:
   IMAGE: cedyrn/php-parent
+  # Oldest PHP version in versions.json that gets the FPM image
+  FPM_MIN_VERSION: "8.4"
 
 jobs:
   matrix:
@@ -25,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       include: ${{ steps.matrix.outputs.include }}
+      fpm-versions: ${{ steps.fpm-matrix.outputs.fpm-versions }}
+      fpm-builds: ${{ steps.fpm-matrix.outputs.fpm-builds }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,6 +47,27 @@ jobs:
           echo "include=${include}" >> "$GITHUB_OUTPUT"
           echo "${include}" | jq .
 
+      # FPM image: one entry per PHP version from FPM_MIN_VERSION, built
+      # natively for each architecture
+      - name: Generate FPM matrix
+        id: fpm-matrix
+        run: |
+          versions=$(jq -c --arg min "$FPM_MIN_VERSION" '
+            [ to_entries[]
+              | select((.key | split(".") | map(tonumber)) >= ($min | split(".") | map(tonumber)))
+              | {minor: .key, version: .value} ]
+          ' versions.json)
+          builds=$(echo "${versions}" | jq -c '
+            [ .[] as $php
+              | ( {arch: "amd64", platform: "linux/amd64", runner: "ubuntu-latest"},
+                  {arch: "arm64", platform: "linux/arm64", runner: "ubuntu-24.04-arm"} )
+              | . + $php ]
+          ')
+          echo "fpm-versions=${versions}" >> "$GITHUB_OUTPUT"
+          echo "fpm-builds=${builds}" >> "$GITHUB_OUTPUT"
+          echo "${builds}" | jq .
+
+  # Legacy mod_php images
   build:
     name: ${{ matrix.tag }}
     needs: matrix
@@ -92,13 +117,141 @@ jobs:
         if: github.event_name != 'pull_request'
         run: docker push "${IMAGE}:${{ matrix.tag }}"
 
+  # FPM image, per PHP version and architecture. Outside pull requests the
+  # image is pushed by digest only (no tag), then that exact digest is pulled
+  # and tested before it can be published.
+  fpm-build:
+    name: fpm ${{ matrix.minor }} (${{ matrix.arch }})
+    needs: matrix
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.fpm-builds) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: type=raw,value=${{ matrix.version }}
+
+      - name: Build
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          build-args: PHP_VERSION=${{ matrix.version }}
+          pull: true
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: ${{ github.event_name != 'pull_request' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', env.IMAGE) || 'type=docker,name=php-parent-test:fpm' }}
+          provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
+          sbom: ${{ github.event_name != 'pull_request' }}
+
+      - name: Select image to test
+        id: image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ref=php-parent-test:fpm
+          else
+            ref="${IMAGE}@${DIGEST}"
+            docker pull "${ref}"
+          fi
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        run: tests/fpm-smoke-test.sh "${{ steps.image.outputs.ref }}" "${{ matrix.version }}"
+
+      - name: Record digest
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digests-${{ matrix.minor }}-${{ matrix.arch }}
+          path: digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Tags each PHP version once every architecture has passed its tests
+  fpm-publish:
+    name: Publish fpm ${{ matrix.minor }}
+    needs: [matrix, fpm-build]
+    if: always() && github.event_name != 'pull_request' && needs.matrix.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.fpm-versions) }}
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: digests-${{ matrix.minor }}-*
+          path: digests
+          merge-multiple: true
+
+      - name: Check every architecture passed
+        run: |
+          count=$(ls digests | wc -l)
+          echo "Found ${count} digests"
+          [ "${count}" -eq 2 ]
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Tag ${{ matrix.version }} and ${{ matrix.minor }}
+        working-directory: digests
+        run: |
+          docker buildx imagetools create \
+            -t "${IMAGE}:${{ matrix.version }}" \
+            -t "${IMAGE}:${{ matrix.minor }}" \
+            $(printf "${IMAGE}@sha256:%s " *)
+          docker buildx imagetools inspect "${IMAGE}:${{ matrix.version }}"
+
   # Single required status check for branch protection, independent of
   # which PHP versions are in the matrix.
   result:
     name: Build result
-    needs: build
+    needs: [build, fpm-build, fpm-publish]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check all builds passed
-        run: test "${{ needs.build.result }}" = "success"
+        run: |
+          test "${{ needs.build.result }}" = "success"
+          test "${{ needs.fpm-build.result }}" = "success"
+          # Publishing is skipped on pull requests
+          case "${{ needs.fpm-publish.result }}" in
+            success|skipped) ;;
+            *) exit 1 ;;
+          esac

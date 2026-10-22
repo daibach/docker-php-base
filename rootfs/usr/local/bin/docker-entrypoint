@@ -1,0 +1,43 @@
+#!/bin/sh
+# Starts the services for the roles given as the command (web, cron, or both),
+# or runs any other command directly.
+set -eu
+
+[ $# -eq 0 ] && set -- web
+
+for arg in "$@"; do
+  case "$arg" in
+    web|cron) ;;
+    *) exec docker-php-entrypoint "$@" ;;
+  esac
+done
+
+contents=/etc/s6-overlay/user-bundles.d/user/contents.d
+rm -f "$contents/php-fpm" "$contents/apache" "$contents/supercronic"
+
+for role in "$@"; do
+  case "$role" in
+    web)
+      touch "$contents/php-fpm" "$contents/apache"
+      ;;
+    cron)
+      if [ ! -f "$CRONTAB" ]; then
+        echo "php-parent: cron role requires a crontab at $CRONTAB" >&2
+        exit 1
+      fi
+      touch "$contents/supercronic"
+      ;;
+  esac
+done
+
+for hook in /docker-entrypoint.d/*; do
+  [ -e "$hook" ] || continue
+  if [ -x "$hook" ]; then
+    echo "php-parent: running $hook"
+    "$hook"
+  else
+    echo "php-parent: skipping $hook (not executable)" >&2
+  fi
+done
+
+exec /init

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Checks the services for the roles this container was started with.
+# Always healthy for containers running other commands.
+contents=/etc/s6-overlay/user-bundles.d/user/contents.d
+
+if [ -e "$contents/apache" ]; then
+  curl -fsS -o /dev/null --max-time 5 http://127.0.0.1/fpm-ping || exit 1
+fi
+
+if [ -e "$contents/supercronic" ]; then
+  [ "$(/command/s6-svstat -o up /run/service/supercronic 2>/dev/null)" = "true" ] || exit 1
+fi
+
+exit 0

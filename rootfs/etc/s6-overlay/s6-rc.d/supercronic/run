@@ -1,0 +1,6 @@
+#!/command/with-contenv sh
+# Jobs run as www-data and inherit the container environment.
+# SUPERCRONIC_ARGS is intentionally unquoted so it can hold several flags.
+HOME=/var/www
+export HOME
+exec s6-setuidgid www-data supercronic ${SUPERCRONIC_ARGS:-} "$CRONTAB"
