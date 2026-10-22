@@ -15,9 +15,9 @@ ARG S6_OVERLAY_X86_64_SHA256=e6befcc96a437a3831386ecfc51808c5d3e939dc5fe3c02ae92
 ARG S6_OVERLAY_AARCH64_SHA256=b17f17a82e7a515c682a91edaf2ffdabb73f891981b6c1fd712115693a2f8b4c
 
 # renovate: datasource=github-releases depName=aptible/supercronic extractVersion=^v(?<version>.+)$
-ARG SUPERCRONIC_VERSION=0.2.50
-ARG SUPERCRONIC_AMD64_SHA256=a53ae236602c7338aba3fbaff40bda6300eae3b9fedb8261eb06cfe3724430c1
-ARG SUPERCRONIC_ARM64_SHA256=02aa0cb229ba09050cba6638059dadb9eedc2276632ea43d6a57a2f8c1629dd5
+ARG SUPERCRONIC_VERSION=0.2.51
+ARG SUPERCRONIC_AMD64_SHA256=cc232108374e8e2b537045f2d5eaa1229f619db314c3ba6a14d38b35dc0aa123
+ARG SUPERCRONIC_ARM64_SHA256=4ae22576a78223d8ccdf5f3b3660a5cbb5288416bf0ca96afc4a36d195932b94
 
 COPY --from=mlocati/php-extension-installer:2.12.2 /usr/bin/install-php-extensions /usr/local/bin/
 COPY --from=composer:2.10.3 /usr/bin/composer /usr/local/bin/composer
