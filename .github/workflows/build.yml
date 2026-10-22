@@ -18,8 +18,6 @@ concurrency:
 
 env:
   IMAGE: cedyrn/php-parent
-  # Oldest PHP version in versions.json that gets the FPM image
-  FPM_MIN_VERSION: "8.4"
 
 jobs:
   matrix:
@@ -47,16 +45,12 @@ jobs:
           echo "include=${include}" >> "$GITHUB_OUTPUT"
           echo "${include}" | jq .
 
-      # FPM image: one entry per PHP version from FPM_MIN_VERSION, built
-      # natively for each architecture
+      # FPM image: one entry per PHP version that gets it, built natively for
+      # each architecture
       - name: Generate FPM matrix
         id: fpm-matrix
         run: |
-          versions=$(jq -c --arg min "$FPM_MIN_VERSION" '
-            [ to_entries[]
-              | select((.key | split(".") | map(tonumber)) >= ($min | split(".") | map(tonumber)))
-              | {minor: .key, version: .value} ]
-          ' versions.json)
+          versions=$(.github/scripts/fpm-versions.sh)
           builds=$(echo "${versions}" | jq -c '
             [ .[] as $php
               | ( {arch: "amd64", platform: "linux/amd64", runner: "ubuntu-latest"},
@@ -195,6 +189,31 @@ jobs:
           path: digests/*
           if-no-files-found: error
           retention-days: 1
+
+      # The scanner never sees the Docker Hub token
+      - name: Log out of Docker Hub
+        if: github.event_name != 'pull_request'
+        run: docker logout
+
+      - name: Set up Trivy
+        uses: ./.github/actions/setup-trivy
+
+      # Report only: findings never fail the build. Published images are also
+      # scanned daily by scan.yml.
+      - name: Vulnerability scan
+        continue-on-error: true
+        env:
+          REF: ${{ steps.image.outputs.ref }}
+        run: |
+          trivy image --scanners vuln --ignore-unfixed --severity HIGH,CRITICAL \
+            --format table --output trivy.txt "${REF}"
+          cat trivy.txt
+          {
+            echo "### fpm ${{ matrix.minor }} (${{ matrix.arch }}): fixable HIGH and CRITICAL vulnerabilities"
+            echo '```'
+            cat trivy.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Tags each PHP version once every architecture has passed its tests
   fpm-publish:

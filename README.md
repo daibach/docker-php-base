@@ -117,7 +117,7 @@ Images are always built from the exact upstream tag (e.g. `php:8.4.27-fpm`), nev
 - **Add a PHP version:** add a line to `versions.json` with its latest patch version. All images for it are built automatically.
 - **Drop a PHP version:** remove its line. Its existing tags stay on Docker Hub but are no longer rebuilt.
 
-The PHP-FPM image is built for versions from `FPM_MIN_VERSION` in `.github/workflows/build.yml` (currently 8.4). The legacy images are built for every version.
+The PHP-FPM image is built for versions from `FPM_MIN_VERSION` in `.github/scripts/fpm-versions.sh` (currently 8.4). The legacy images are built for every version.
 
 ### Updates
 
@@ -129,6 +129,7 @@ The PHP-FPM image is built for versions from `FPM_MIN_VERSION` in `.github/workf
 | PHP minor and major versions | | Ignored; add them to `versions.json` by hand |
 | Composer and `install-php-extensions` (non-major) | 3 days | Automatic once the build passes |
 | s6-overlay and supercronic | 3 days | Manual: update the `*_SHA256` build arguments in the `Dockerfile` in the same PR |
+| Trivy | 3 days | Manual: update the `*_SHA256` checksums in `.github/actions/setup-trivy/action.yml` in the same PR |
 | GitHub Actions (non-major) | | Automatic once the build passes |
 
 **Urgent patches:** open the Dependency Dashboard issue and tick the box to make Renovate check immediately, or edit `versions.json` by hand.
@@ -144,9 +145,24 @@ Images are built by GitHub Actions (`.github/workflows/build.yml`):
 | Weekly (Monday 04:00 UTC) | Same as a push to `main`, to pick up upstream Debian updates to the same PHP version. |
 | Manual (Actions → Build images → Run workflow) | Same as a push to `main`. Rebuilds the versions already in `versions.json`. |
 
+Each build also applies any Debian security updates, so fixes don't wait for the upstream PHP image to be rebuilt.
+
 The PHP-FPM image is built natively on amd64 and arm64 runners. Each architecture is pushed by digest, without a tag, and that exact image is pulled and tested. A version's tags are only updated when every architecture has passed. Published images include build provenance and an SBOM.
 
 The `Build result` check passes only when every image passes, and is the required status check for `main`.
+
+### Vulnerability scanning
+
+The PHP-FPM image is scanned with [Trivy](https://trivy.dev/). Only vulnerabilities with a fix available are reported; findings never fail a build.
+
+| When | What | Results |
+|---|---|---|
+| Every build | The image just built, for each architecture | HIGH and CRITICAL findings in the job summary |
+| Daily (05:00 UTC, `.github/workflows/scan.yml`) | The published tag for each PHP version (amd64) | All findings in the repository's Security tab, plus HIGH and CRITICAL in the job summary |
+
+Alerts in the Security tab close automatically once a scan no longer finds them. Most findings are fixed by a rebuild (the weekly build, or Actions → Build images → Run workflow) or by updating s6-overlay or supercronic. A vulnerability in a Debian package with no fix is not reported until Debian releases one.
+
+Trivy is downloaded from its GitHub release and checked against a pinned checksum, and it runs after the build has logged out of Docker Hub.
 
 ### Tests
 

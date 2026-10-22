@@ -1,0 +1,28 @@
+name: Set up Trivy
+description: Installs a pinned Trivy release, verified against its checksum
+runs:
+  using: composite
+  steps:
+    - name: Install Trivy
+      shell: bash
+      env:
+        # renovate: datasource=github-releases depName=aquasecurity/trivy extractVersion=^v(?<version>.+)$
+        TRIVY_VERSION: 0.76.0
+        TRIVY_LINUX_64BIT_SHA256: e24b1c51293c1b15e4ba8d45bbc7891ba053f90278ec2698f3562c993e145fe7
+        TRIVY_LINUX_ARM64_SHA256: aab21e677a7b7071fc79f1711480840754c18a1b9d9cefa7ccd06af63a0e8f4c
+      run: |
+        set -euo pipefail
+        case "${RUNNER_ARCH}" in
+          X64) asset=Linux-64bit; sha="${TRIVY_LINUX_64BIT_SHA256}" ;;
+          ARM64) asset=Linux-ARM64; sha="${TRIVY_LINUX_ARM64_SHA256}" ;;
+          *) echo "Unsupported runner architecture: ${RUNNER_ARCH}" >&2; exit 1 ;;
+        esac
+        dir="${RUNNER_TEMP}/trivy"
+        mkdir -p "${dir}"
+        curl -fsSLo "${dir}/trivy.tar.gz" \
+          "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_${asset}.tar.gz"
+        echo "${sha}  ${dir}/trivy.tar.gz" | sha256sum -c -
+        tar -xzf "${dir}/trivy.tar.gz" -C "${dir}" trivy
+        rm "${dir}/trivy.tar.gz"
+        echo "${dir}" >> "${GITHUB_PATH}"
+        "${dir}/trivy" --version

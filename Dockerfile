@@ -42,9 +42,11 @@ RUN set -eux; \
     chmod +x /usr/local/bin/supercronic; \
     rm -f /tmp/s6-*.tar.xz
 
-# Apache, tools and PHP extensions
+# Debian security updates (without waiting for the upstream image to be
+# rebuilt), Apache, tools and PHP extensions
 RUN set -eux; \
     apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y; \
     apt-get install -y --no-install-recommends apache2 git unzip zip; \
     rm -rf /var/lib/apt/lists/*; \
     install-php-extensions pdo_mysql mysqli intl zip gd opcache apcu; \
