@@ -1,14 +1,106 @@
 # docker-php-base
 
-Base PHP images published to Docker Hub as `cedyrn/php-parent:<minor>-<variant>`, e.g. `cedyrn/php-parent:8.4-apache-cron`.
+Base PHP images published to Docker Hub as `cedyrn/php-parent`.
 
-| Variant | Contents |
+| Tags | Image |
 |---|---|
-| `apache` | Official `php:<version>-apache` image (mod_php) with common extensions, hardened PHP and Apache config, and Composer |
-| `apache-cron` | As `apache`, with `/var/log/cron.log` created |
-| `cli` | Official `php:<version>-cli` image with common extensions, hardened PHP config, and Composer |
+| `8.4.27`, `8.4`, `8.5.12`, `8.5` | **PHP-FPM image** (`Dockerfile`): PHP-FPM behind Apache, with cron via supercronic. amd64 and arm64. Use this for new work. |
+| `8.x-apache`, `8.x-apache-cron`, `8.x-cli` | **Legacy images** (`legacy/Dockerfile`): mod_php. To be retired once all apps have moved to the PHP-FPM image. See [docs/MIGRATING.md](docs/MIGRATING.md). |
 
-All variants are built from `legacy/Dockerfile` using `--target <variant>`.
+Use the exact version tag (e.g. `cedyrn/php-parent:8.4.27`) in application Dockerfiles, so builds never pick up a stale cached copy of a moving tag.
+
+## PHP-FPM image
+
+Based on the official `php:<version>-fpm` image, with:
+
+- Apache (`mpm_event`) passing PHP requests to PHP-FPM, with `rewrite` and `headers` enabled and `.htaccess` allowed
+- PHP extensions: `pdo_mysql`, `mysqli`, `intl`, `zip`, `gd`, `opcache`, `apcu`
+- Composer, `install-php-extensions` (to add extensions in an app's Dockerfile), `git`, `zip`, `unzip`, `curl`
+- [supercronic](https://github.com/aptible/supercronic) for cron, and [s6-overlay](https://github.com/just-containers/s6-overlay) to supervise processes
+- Hardened PHP (`php.ini-production`, `expose_php` off) and Apache (no version in headers or error pages, no `TRACE`)
+
+### Roles
+
+The container's command selects what runs:
+
+| Command | Runs | As |
+|---|---|---|
+| `web` (default) | Apache and PHP-FPM on port 80 | Apache and FPM workers as `www-data` |
+| `cron` | supercronic, using the crontab at `$CRONTAB` | `www-data` |
+| `web cron` | both | as above |
+| anything else, e.g. `php spark migrate` | that command, directly | `root`, unless the app's Dockerfile sets `USER` |
+
+```dockerfile
+FROM cedyrn/php-parent:8.4.27
+COPY crontab /etc/supercronic/crontab
+CMD ["web", "cron"]
+```
+
+For the `web` and `cron` roles:
+
+- Container environment variables reach PHP, for both web requests and cron jobs.
+- Logs go to stdout and stderr: Apache access log, PHP and FPM errors, and cron job output.
+- If Apache, PHP-FPM or supercronic exits unexpectedly, the container stops so it can be replaced.
+- On stop (`SIGTERM`), Apache finishes in-flight requests and supercronic waits for running jobs, for up to 25 seconds. Allow at least 30 seconds before the container is killed (the ECS default).
+
+### Cron
+
+The crontab uses standard 5-field cron syntax, with no user column. supercronic also accepts 7 fields (seconds first, year last) for jobs that run more than once a minute. Jobs run as `www-data` with `/bin/sh`, see the container's environment, and log to the container output.
+
+```cron
+*/10 * * * * php /var/www/spark email-queue:send
+0 1 * * *    php /var/www/spark log:cleanup
+```
+
+A job does not start again while its previous run is still going. The `cron` role fails at start-up if no crontab exists. Check a crontab during an app's build with `RUN supercronic -test /etc/supercronic/crontab`.
+
+### Start-up hooks
+
+Executable files in `/docker-entrypoint.d/` are run in name order, as root, before the `web` and `cron` roles start. A hook that fails stops the container. Hooks are not run for other commands.
+
+### Health checks
+
+`healthcheck` checks the services for the container's roles: `/fpm-ping` through Apache for `web`, and that supercronic is running for `cron`. It always succeeds for other commands. The image's Docker `HEALTHCHECK` uses it. ECS ignores Dockerfile health checks, so for ECS add it to the container definition:
+
+```json
+"healthCheck": {
+  "command": ["CMD", "healthcheck"],
+  "interval": 30,
+  "timeout": 10,
+  "retries": 3,
+  "startPeriod": 15
+}
+```
+
+`/fpm-ping` returns `pong` and can also be used by a load balancer. `/fpm-status` (FPM worker status) is only available from inside the container. Requests to both are left out of the access log.
+
+### Configuration
+
+Set with environment variables, e.g. in the ECS task definition:
+
+| Variable | Default | |
+|---|---|---|
+| `APACHE_DOCUMENT_ROOT` | `/var/www/html` | Directory Apache serves |
+| `CRONTAB` | `/etc/supercronic/crontab` | Crontab for the `cron` role |
+| `SUPERCRONIC_ARGS` | | Extra supercronic flags, e.g. `-json` |
+| `PHP_MEMORY_LIMIT` | `128M` | `memory_limit` |
+| `PHP_UPLOAD_MAX_FILESIZE` | `2M` | `upload_max_filesize` |
+| `PHP_POST_MAX_SIZE` | `8M` | `post_max_size` |
+| `PHP_MAX_EXECUTION_TIME` | `30` | `max_execution_time` |
+| `PHP_OPCACHE_MEMORY` | `128` | opcache memory in MB |
+| `PHP_OPCACHE_VALIDATE_TIMESTAMPS` | `0` | Set to `1` when code changes while running, e.g. local development with mounted code |
+| `PHP_APCU_MEMORY` | `32M` | APCu shared memory |
+| `PHP_FPM_PM` | `ondemand` | FPM process manager: `ondemand`, `dynamic` or `static` |
+| `PHP_FPM_MAX_CHILDREN` | `10` | Maximum concurrent PHP requests |
+| `PHP_FPM_PROCESS_IDLE_TIMEOUT` | `10s` | `ondemand`: how long idle workers are kept |
+| `PHP_FPM_START_SERVERS` / `PHP_FPM_MIN_SPARE_SERVERS` / `PHP_FPM_MAX_SPARE_SERVERS` | `2` / `1` / `3` | `dynamic` only |
+| `PHP_FPM_MAX_REQUESTS` | `500` | Requests before a worker is replaced |
+
+`PHP_FPM_MAX_CHILDREN` limits how many PHP requests run at once; further requests wait. Each busy worker uses memory, roughly the memory of one request, so size it to the container's memory.
+
+Other PHP settings can be changed with a `.user.ini` file in the document root or an extra `.ini` file in `$PHP_INI_DIR/conf.d/`. `php_value` and `php_flag` in `.htaccess` do not work with PHP-FPM.
+
+Add PHP extensions in an app's Dockerfile with `RUN install-php-extensions redis`.
 
 ## PHP versions
 
@@ -20,20 +112,24 @@ All variants are built from `legacy/Dockerfile` using `--target <variant>`.
 }
 ```
 
-Images are always built from the exact upstream tag (e.g. `php:8.4.27-apache`), never the moving `php:8.4-apache` tag, which can lag behind new releases.
+Images are always built from the exact upstream tag (e.g. `php:8.4.27-fpm`), never the moving `php:8.4-fpm` tag, which can lag behind new releases.
 
-- **Add a PHP version:** add a line to `versions.json` with its latest patch version. All variants for it are built automatically.
+- **Add a PHP version:** add a line to `versions.json` with its latest patch version. All images for it are built automatically.
 - **Drop a PHP version:** remove its line. Its existing tags stay on Docker Hub but are no longer rebuilt.
 
-### Patch releases
+The PHP-FPM image is built for versions from `FPM_MIN_VERSION` in `.github/workflows/build.yml` (currently 8.4). The legacy images are built for every version.
 
-[Renovate](https://docs.renovatebot.com/) watches `versions.json` for new PHP patch versions on Docker Hub:
+### Updates
 
-- It waits an hour after a new patch tag is published, so that every upstream variant is available.
-- It opens a PR, grouping patches released together, and enables auto-merge. The PR merges once the build passes, and the merge pushes updated images.
-- New PHP minor and major versions are ignored; add those to `versions.json` by hand.
+[Renovate](https://docs.renovatebot.com/) watches for updates and opens PRs:
 
-Non-major updates to GitHub Actions used by the workflow are also auto-merged. Major updates get a PR for review.
+| Update | Wait after release | Merge |
+|---|---|---|
+| PHP patch versions in `versions.json` | 1 hour, so every upstream image is published | Automatic once the build passes. Patches released together are grouped. |
+| PHP minor and major versions | | Ignored; add them to `versions.json` by hand |
+| Composer and `install-php-extensions` (non-major) | 3 days | Automatic once the build passes |
+| s6-overlay and supercronic | 3 days | Manual: update the `*_SHA256` build arguments in the `Dockerfile` in the same PR |
+| GitHub Actions (non-major) | | Automatic once the build passes |
 
 **Urgent patches:** open the Dependency Dashboard issue and tick the box to make Renovate check immediately, or edit `versions.json` by hand.
 
@@ -44,21 +140,28 @@ Images are built by GitHub Actions (`.github/workflows/build.yml`):
 | Trigger | Result |
 |---|---|
 | Pull request | Builds and tests every image. Nothing is pushed. |
-| Push to `main` | Builds, tests and pushes every image. |
+| Push to `main` | Builds, tests and publishes every image. |
 | Weekly (Monday 04:00 UTC) | Same as a push to `main`, to pick up upstream Debian updates to the same PHP version. |
 | Manual (Actions → Build images → Run workflow) | Same as a push to `main`. Rebuilds the versions already in `versions.json`. |
 
-Each image is checked by `tests/smoke-test.sh` before it is pushed. If a test fails, that image's tag is not updated. The script can be run locally against a built image:
+The PHP-FPM image is built natively on amd64 and arm64 runners. Each architecture is pushed by digest, without a tag, and that exact image is pulled and tested. A version's tags are only updated when every architecture has passed. Published images include build provenance and an SBOM.
+
+The `Build result` check passes only when every image passes, and is the required status check for `main`.
+
+### Tests
+
+`tests/fpm-smoke-test.sh` tests the PHP-FPM image and `tests/smoke-test.sh` the legacy images. Both can be run locally against a built image:
 
 ```sh
+docker build -t php-parent-test:8.4 --build-arg PHP_VERSION=8.4.27 .
+tests/fpm-smoke-test.sh php-parent-test:8.4 8.4.27
+
 docker build -t php-parent-test:8.4-apache --target apache \
   --build-arg PHP_VERSION=8.4.27 --build-arg BASE_TYPE=apache legacy
 tests/smoke-test.sh php-parent-test:8.4-apache 8.4.27
 ```
 
-Apache tests are selected when the image name contains `apache`. The optional second argument checks the PHP version.
-
-The `Build result` check passes only when every image passes, and is the required status check for `main`.
+The optional second argument checks the PHP version. The FPM tests use port 8080 on the host, or `SMOKE_PORT`. The legacy script selects Apache tests when the image name contains `apache`.
 
 ### Configuration
 

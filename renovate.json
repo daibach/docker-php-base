@@ -1,12 +1,19 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended",
+    "customManagers:dockerfileVersions"
+  ],
   "customManagers": [
     {
       "description": "PHP versions in versions.json, looked up as php image tags on Docker Hub",
       "customType": "regex",
-      "managerFilePatterns": ["/^versions\\.json$/"],
-      "matchStrings": ["\"\\d+\\.\\d+\":\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+      "managerFilePatterns": [
+        "/^versions\\.json$/"
+      ],
+      "matchStrings": [
+        "\"\\d+\\.\\d+\":\\s*\"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""
+      ],
       "depNameTemplate": "php",
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
@@ -15,31 +22,82 @@
   "packageRules": [
     {
       "description": "Offer patch updates separately, otherwise only the latest minor is proposed",
-      "matchManagers": ["custom.regex"],
-      "matchDepNames": ["php"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "php"
+      ],
       "separateMinorPatch": true
     },
     {
       "description": "New PHP minor/major versions are added to versions.json by hand",
-      "matchManagers": ["custom.regex"],
-      "matchDepNames": ["php"],
-      "matchUpdateTypes": ["minor", "major"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "php"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
       "enabled": false
     },
     {
       "description": "Auto-merge PHP patch releases once all upstream variants have had time to publish",
-      "matchManagers": ["custom.regex"],
-      "matchDepNames": ["php"],
-      "matchUpdateTypes": ["patch"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "php"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "groupName": "PHP patch versions",
       "minimumReleaseAge": "1 hour",
       "automerge": true
     },
     {
       "description": "Auto-merge non-major GitHub Actions updates",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
       "automerge": true
+    },
+    {
+      "description": "Auto-merge non-major updates to Composer and install-php-extensions in the Dockerfile, a few days after release",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchDepNames": [
+        "composer",
+        "mlocati/php-extension-installer"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "minimumReleaseAge": "3 days",
+      "automerge": true
+    },
+    {
+      "description": "s6-overlay and supercronic downloads are pinned by checksum, which must be updated by hand in the same PR",
+      "matchDepNames": [
+        "just-containers/s6-overlay",
+        "aptible/supercronic"
+      ],
+      "minimumReleaseAge": "3 days",
+      "automerge": false,
+      "prBodyNotes": [
+        "Update the matching `*_SHA256` build arguments in the Dockerfile before merging; the build fails until they match."
+      ]
     }
   ]
 }
