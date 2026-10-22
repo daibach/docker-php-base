@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    "customManagers:dockerfileVersions"
+    "customManagers:dockerfileVersions",
+    "customManagers:githubActionsVersions"
   ],
   "customManagers": [
     {
@@ -88,15 +89,16 @@
       "automerge": true
     },
     {
-      "description": "s6-overlay and supercronic downloads are pinned by checksum, which must be updated by hand in the same PR",
+      "description": "s6-overlay, supercronic and Trivy downloads are pinned by checksum, which must be updated by hand in the same PR",
       "matchDepNames": [
         "just-containers/s6-overlay",
-        "aptible/supercronic"
+        "aptible/supercronic",
+        "aquasecurity/trivy"
       ],
       "minimumReleaseAge": "3 days",
       "automerge": false,
       "prBodyNotes": [
-        "Update the matching `*_SHA256` build arguments in the Dockerfile before merging; the build fails until they match."
+        "Update the matching `*_SHA256` checksums before merging: build arguments in the `Dockerfile` for s6-overlay and supercronic, or `.github/actions/setup-trivy/action.yml` for Trivy. The build fails until they match."
       ]
     }
   ]

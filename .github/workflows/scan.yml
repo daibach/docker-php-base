@@ -1,0 +1,76 @@
+name: Scan images
+
+on:
+  schedule:
+    # Daily, to catch vulnerabilities disclosed since the images were built
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: cedyrn/php-parent
+
+jobs:
+  matrix:
+    name: Scan matrix
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.versions.outputs.versions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: FPM versions
+        id: versions
+        run: |
+          versions=$(.github/scripts/fpm-versions.sh)
+          echo "versions=${versions}" >> "$GITHUB_OUTPUT"
+          echo "${versions}" | jq .
+
+  # Scans the published FPM image for each PHP version and reports to the
+  # repository's Security tab. Only vulnerabilities with a fix are reported.
+  # amd64 only: both architectures have the same package versions.
+  scan:
+    name: Scan ${{ matrix.minor }}
+    needs: matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.versions) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Trivy
+        uses: ./.github/actions/setup-trivy
+
+      - name: Scan ${{ env.IMAGE }}:${{ matrix.minor }}
+        run: |
+          trivy image --image-src remote --platform linux/amd64 \
+            --scanners vuln --ignore-unfixed \
+            --format json --output trivy.json "${IMAGE}:${{ matrix.minor }}"
+          trivy convert --format sarif --output trivy.sarif trivy.json
+          trivy convert --format table --severity HIGH,CRITICAL --output trivy.txt trivy.json
+          {
+            echo "### ${IMAGE}:${{ matrix.minor }}: fixable HIGH and CRITICAL vulnerabilities"
+            echo '```'
+            cat trivy.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload to Security tab
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: trivy.sarif
+          category: php-parent-${{ matrix.minor }}
