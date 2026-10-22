@@ -20,23 +20,38 @@ env:
   IMAGE: cedyrn/php-parent
 
 jobs:
+  matrix:
+    name: Build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      include: ${{ steps.matrix.outputs.include }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # One entry per PHP version in versions.json and legacy variant
+      - name: Generate matrix
+        id: matrix
+        run: |
+          include=$(jq -c '
+            [ to_entries[] as $php
+              | ( {variant: "apache", base: "apache"},
+                  {variant: "apache-cron", base: "apache"},
+                  {variant: "cli", base: "cli"} )
+              | . + {version: $php.value, tag: "\($php.key)-\(.variant)"} ]
+          ' versions.json)
+          echo "include=${include}" >> "$GITHUB_OUTPUT"
+          echo "${include}" | jq .
+
   build:
-    name: ${{ matrix.variant }}
+    name: ${{ matrix.tag }}
+    needs: matrix
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        variant:
-          - 8.3-apache
-          - 8.3-apache-cron
-          - 8.3-cli
-          - 8.4-apache
-          - 8.4-apache-cron
-          - 8.4-cli
-          - 8.5-apache
-          - 8.5-apache-cron
-          - 8.5-cli
+        include: ${{ fromJSON(needs.matrix.outputs.include) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,22 +68,37 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.IMAGE }}
-          tags: type=raw,value=${{ matrix.variant }}
+          tags: type=raw,value=${{ matrix.tag }}
 
       # Built into the local Docker engine so the image that is tested is
       # exactly the image that is pushed.
       - name: Build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: ${{ matrix.variant }}
+          context: legacy
+          target: ${{ matrix.variant }}
+          build-args: |
+            PHP_VERSION=${{ matrix.version }}
+            BASE_TYPE=${{ matrix.base }}
           pull: true
           load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Smoke test
-        run: tests/smoke-test.sh "${IMAGE}:${{ matrix.variant }}"
+        run: tests/smoke-test.sh "${IMAGE}:${{ matrix.tag }}" "${{ matrix.version }}"
 
       - name: Push
         if: github.event_name != 'pull_request'
-        run: docker push "${IMAGE}:${{ matrix.variant }}"
+        run: docker push "${IMAGE}:${{ matrix.tag }}"
+
+  # Single required status check for branch protection, independent of
+  # which PHP versions are in the matrix.
+  result:
+    name: Build result
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all builds passed
+        run: test "${{ needs.build.result }}" = "success"
