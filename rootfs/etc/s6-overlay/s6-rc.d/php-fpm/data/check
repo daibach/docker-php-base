@@ -1,0 +1,5 @@
+#!/bin/bash
+# Readiness check for s6-notifyoncheck: succeeds once FPM is listening.
+# Failed attempts are expected while FPM starts, so their errors are hidden.
+exec 2>/dev/null
+exec 3<>/dev/tcp/127.0.0.1/9000
