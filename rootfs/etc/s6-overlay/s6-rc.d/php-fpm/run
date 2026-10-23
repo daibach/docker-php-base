@@ -1,2 +1,4 @@
 #!/command/with-contenv sh
-exec php-fpm -F
+# Signals readiness once FPM accepts connections, so Apache (which depends on
+# this service) doesn't start and return 503s while FPM is still starting
+exec s6-notifyoncheck -d -n 0 -s 50 -w 100 php-fpm -F

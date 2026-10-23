@@ -95,8 +95,11 @@ Set with environment variables, e.g. in the ECS task definition:
 | `PHP_FPM_PROCESS_IDLE_TIMEOUT` | `10s` | `ondemand`: how long idle workers are kept |
 | `PHP_FPM_START_SERVERS` / `PHP_FPM_MIN_SPARE_SERVERS` / `PHP_FPM_MAX_SPARE_SERVERS` | `2` / `1` / `3` | `dynamic` only |
 | `PHP_FPM_MAX_REQUESTS` | `500` | Requests before a worker is replaced |
+| `PHP_FPM_SLOWLOG_TIMEOUT` | `0` (off) | Log requests running longer than this, e.g. `5s` |
 
-`PHP_FPM_MAX_CHILDREN` limits how many PHP requests run at once; further requests wait. Each busy worker uses memory, roughly the memory of one request, so size it to the container's memory.
+`PHP_FPM_MAX_CHILDREN` limits how many PHP requests run at once; further requests wait. Each busy worker uses memory, roughly the memory of one request, so size it to the container's memory. When every worker is busy, FPM logs `server reached max_children setting` to stderr.
+
+With `PHP_FPM_SLOWLOG_TIMEOUT` set, FPM logs a warning to stderr for each request that runs longer, with the script and URI, such as `executing too slow (5.012 sec), logging`. That shows which requests hold workers. A PHP stack trace follows only when the container has the `SYS_PTRACE` capability, which Docker and ECS don't grant by default. Without it, each slow request also logs `ERROR: failed to ptrace(ATTACH) child`, and the `slow requests` count in `/fpm-status` stays at 0. In ECS, add the capability with `"linuxParameters": {"capabilities": {"add": ["SYS_PTRACE"]}}`.
 
 Other PHP settings can be changed with a `.user.ini` file in the document root or an extra `.ini` file in `$PHP_INI_DIR/conf.d/`. `php_value` and `php_flag` in `.htaccess` do not work with PHP-FPM.
 

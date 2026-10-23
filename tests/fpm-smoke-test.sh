@@ -176,6 +176,39 @@ docker stop "$PREFIX-web" >/dev/null
 [ "$(exit_code web)" = "0" ] || fail "web role exit code $(exit_code web) on stop"
 pass "clean stop"
 
+echo "== Apache waits for FPM at start-up"
+start startup -p "127.0.0.1:$PORT:80"
+copy_in startup "$WORK/index.php" /var/www/html/index.php
+docker start "$PREFIX-startup" >/dev/null
+codes=""
+i=0
+while [ "$i" -lt 300 ]; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$URL/" || true)
+  codes="$codes $code"
+  [ "$code" = "200" ] && break
+  i=$((i + 1))
+  sleep 0.1
+done
+[ "$code" = "200" ] || fail "web role did not start:$codes"
+case "$codes" in *" 5"*) fail "errors while starting:$codes" ;; esac
+docker logs "$PREFIX-startup" 2>&1 | grep -q "AH01079" && fail "Apache could not reach FPM at start-up"
+docker rm -f "$PREFIX-startup" >/dev/null
+pass "no errors while FPM starts"
+
+echo "== Slow request log"
+cat > "$WORK/slow.php" <<'EOF2'
+<?php sleep(2); echo "slow-ok";
+EOF2
+start slowlog -p "127.0.0.1:$PORT:80" -e PHP_FPM_SLOWLOG_TIMEOUT=1s
+copy_in slowlog "$WORK/slow.php" /var/www/html/slow.php
+docker start "$PREFIX-slowlog" >/dev/null
+wait_for 30 curl -fsS "$URL/fpm-ping" || fail "web role with PHP_FPM_SLOWLOG_TIMEOUT did not start"
+[ "$(http "$URL/slow.php")" = "slow-ok" ] || fail "slow request failed"
+docker logs "$PREFIX-slowlog" 2>&1 | grep -q "script '/var/www/html/slow.php' .* executing too slow" \
+  || { docker logs "$PREFIX-slowlog"; fail "slow request not logged"; }
+docker rm -f "$PREFIX-slowlog" >/dev/null
+pass "PHP_FPM_SLOWLOG_TIMEOUT logs slow requests"
+
 echo "== Document root override"
 mkdir -p "$WORK/public"
 echo '<?php echo "public-root";' > "$WORK/public/index.php"
