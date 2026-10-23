@@ -46,7 +46,7 @@
       "enabled": false
     },
     {
-      "description": "Auto-merge PHP patch releases once all upstream variants have had time to publish",
+      "description": "Auto-merge PHP patch releases. Docker Hub gives no release timestamps for php (anonymous tag listings stop after 1,000 of its ~16,000 tags), so without timestamp-optional the release age check holds every patch as pending. If upstream hasn't published every variant yet, the build fails and nothing merges until the check is re-run.",
       "matchManagers": [
         "custom.regex"
       ],
@@ -58,6 +58,7 @@
       ],
       "groupName": "PHP patch versions",
       "minimumReleaseAge": "1 hour",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
       "automerge": true
     },
     {
