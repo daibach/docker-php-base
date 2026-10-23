@@ -164,6 +164,20 @@ Alerts in the Security tab close automatically once a scan no longer finds them.
 
 Trivy is downloaded from its GitHub release and checked against a pinned checksum, and it runs after the build has logged out of Docker Hub.
 
+### Pruning old tags
+
+Each PHP patch release adds a new `X.Y.Z` tag. `.github/workflows/prune.yml` runs weekly (Monday 06:00 UTC) and lists, in the run's summary, which old patch tags would be deleted. Within each minor version it keeps:
+
+- the current version in `versions.json`
+- the newest 3 patch tags, so a dropped minor version keeps its last releases
+- any tag pulled in the last 30 days, so apps pinned to an older version can still be rebuilt
+
+Scheduled runs never delete anything. To delete the listed tags, run Actions → Prune tags → Run workflow from `main` with **apply** ticked. Only `X.Y.Z` tags are pruned; `X.Y` and legacy tags are deleted by hand when retired.
+
+Check the plan locally with `.github/scripts/hub-tags.sh cedyrn/php-parent | .github/scripts/prune-plan.sh` (`KEEP` and `PULL_DAYS` change the limits).
+
+Deleting a tag leaves its image untagged, as does every rebuild of an existing tag. Docker Hub's API cannot list untagged images, so remove them from time to time in the repository's **Image Management** page on Docker Hub.
+
 ### Tests
 
 `tests/fpm-smoke-test.sh` tests the PHP-FPM image and `tests/smoke-test.sh` the legacy images. Both can be run locally against a built image:
@@ -185,3 +199,7 @@ The workflow pushes using a Docker Hub personal access token with Read & Write p
 
 - `DOCKERHUB_USERNAME`: repository variable
 - `DOCKERHUB_TOKEN`: repository secret
+
+Deleting tags uses a separate token, so the build token cannot delete anything. In a GitHub environment named `docker-hub-prune`, limited to the `main` branch:
+
+- `DOCKERHUB_PRUNE_TOKEN`: environment secret, a Docker Hub personal access token with Read, Write & Delete permission
