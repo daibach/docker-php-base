@@ -98,6 +98,13 @@ pass "composer, install-php-extensions, supercronic present"
 [ "$(run php -r 'echo ini_get("expose_php") ? "on" : "off";')" = "off" ] || fail "expose_php is on"
 pass "expose_php off"
 
+INFO=$(run cat /etc/php-parent/build.json) || fail "build info missing"
+[ "$(run php -r '
+  $info = json_decode(file_get_contents("/etc/php-parent/build.json"), true);
+  echo $info["php_version"] === PHP_VERSION && strtotime($info["built_at"]) ? "ok" : "bad";
+')" = "ok" ] || fail "build info invalid: $INFO"
+pass "build info: $(echo "$INFO" | tr -d '\n ')"
+
 echo "== Commands"
 set +e
 run sh -c 'exit 3'

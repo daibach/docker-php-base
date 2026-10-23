@@ -74,6 +74,35 @@ Executable files in `/docker-entrypoint.d/` are run in name order, as root, befo
 
 `/fpm-ping` returns `pong` and can also be used by a load balancer. `/fpm-status` (FPM worker status) is only available from inside the container. Requests to both are left out of the access log.
 
+### Build info
+
+`/etc/php-parent/build.json` describes the build of the image, and is inherited by app images built from it:
+
+```json
+{
+    "image": "cedyrn/php-parent",
+    "php_version": "8.4.27",
+    "debian_version": "13.7",
+    "architecture": "amd64",
+    "built_at": "2026-10-23T10:51:26Z",
+    "source_revision": "d04c230f...",
+    "build_url": "https://github.com/daibach/docker-php-base/actions/runs/..."
+}
+```
+
+The same tag is rebuilt weekly and for Debian security updates, so `built_at` shows how up to date an app's base image is better than the PHP version does. An app picks up a new base image only when it is rebuilt. Apps can report it from their health check endpoint:
+
+```php
+$base = json_decode((string) @file_get_contents('/etc/php-parent/build.json'), true) ?: [];
+$health['base_image'] = [
+    'built_at' => $base['built_at'] ?? null,
+    'age_days' => isset($base['built_at']) ? intdiv(time() - strtotime($base['built_at']), 86400) : null,
+    'revision' => substr($base['source_revision'] ?? '', 0, 7) ?: null,
+];
+```
+
+Alerting on `age_days` (e.g. over 14) finds apps that haven't been rebuilt since the base image was updated. On a public endpoint, consider leaving out version numbers. `source_revision` and `build_url` are empty for local builds. The legacy images don't have this file.
+
 ### Configuration
 
 Set with environment variables, e.g. in the ECS task definition:

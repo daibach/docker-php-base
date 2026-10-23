@@ -91,6 +91,25 @@ RUN set -eux; \
     a2ensite app; \
     apache2ctl -t
 
+# Describes this build, for apps to report (e.g. in a health check endpoint).
+# Last, so a new build date doesn't invalidate the cache of earlier layers.
+ARG BUILD_DATE
+ARG BUILD_REVISION
+ARG BUILD_URL
+RUN set -eux; \
+    mkdir -p /etc/php-parent; \
+    BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" php -r ' \
+      echo json_encode([ \
+        "image" => "cedyrn/php-parent", \
+        "php_version" => PHP_VERSION, \
+        "debian_version" => trim(file_get_contents("/etc/debian_version")), \
+        "architecture" => getenv("TARGETARCH"), \
+        "built_at" => getenv("BUILD_DATE"), \
+        "source_revision" => getenv("BUILD_REVISION") ?: null, \
+        "build_url" => getenv("BUILD_URL") ?: null, \
+      ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";' > /etc/php-parent/build.json; \
+    cat /etc/php-parent/build.json
+
 EXPOSE 80
 # The official FPM image stops with SIGQUIT; s6-overlay and commands expect SIGTERM
 STOPSIGNAL SIGTERM
