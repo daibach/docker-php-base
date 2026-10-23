@@ -5,7 +5,7 @@ Base PHP images published to Docker Hub as `cedyrn/php-parent`.
 | Tags | Image |
 |---|---|
 | `8.4.27`, `8.4`, `8.5.12`, `8.5` | **PHP-FPM image** (`Dockerfile`): PHP-FPM behind Apache, with cron via supercronic. amd64 and arm64. Use this for new work. |
-| `8.x-apache`, `8.x-apache-cron`, `8.x-cli` | **Legacy images** (`legacy/Dockerfile`): mod_php. To be retired once all apps have moved to the PHP-FPM image. See [docs/MIGRATING.md](docs/MIGRATING.md). |
+| `8.x-apache`, `8.x-apache-cron` | **Legacy images** (`legacy/Dockerfile`): mod_php. To be retired once all apps have moved to the PHP-FPM image. See [docs/MIGRATING.md](docs/MIGRATING.md). The `8.3-*` and `*-cli` tags are no longer rebuilt. |
 
 Use the exact version tag (e.g. `cedyrn/php-parent:8.4.27`) in application Dockerfiles, so builds never pick up a stale cached copy of a moving tag.
 

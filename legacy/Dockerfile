@@ -1,5 +1,5 @@
-# Legacy mod_php images: cedyrn/php-parent:<minor>-apache, -apache-cron and -cli.
-# Built with --target apache|apache-cron|cli. To be retired once apps move to the new image.
+# Legacy mod_php images: cedyrn/php-parent:<minor>-apache and -apache-cron.
+# Built with --target apache|apache-cron. To be retired once apps move to the new image.
 ARG PHP_VERSION
 ARG BASE_TYPE
 
@@ -22,12 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Harden PHP
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 RUN sed -i -e s/expose_php=on/expose_php=off/g "$PHP_INI_DIR/php.ini"
-
-
-FROM common AS cli
-
-# Install composer
-RUN php -r "readfile('http://getcomposer.org/installer');" | php -- --install-dir=/usr/bin/ --filename=composer
 
 
 FROM common AS apache
