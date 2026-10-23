@@ -38,8 +38,7 @@ jobs:
           include=$(jq -c '
             [ to_entries[] as $php
               | ( {variant: "apache", base: "apache"},
-                  {variant: "apache-cron", base: "apache"},
-                  {variant: "cli", base: "cli"} )
+                  {variant: "apache-cron", base: "apache"} )
               | . + {version: $php.value, tag: "\($php.key)-\(.variant)"} ]
           ' versions.json)
           echo "include=${include}" >> "$GITHUB_OUTPUT"
