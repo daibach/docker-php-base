@@ -101,7 +101,8 @@ pass "expose_php off"
 INFO=$(run cat /etc/php-parent/build.json) || fail "build info missing"
 [ "$(run php -r '
   $info = json_decode(file_get_contents("/etc/php-parent/build.json"), true);
-  echo $info["php_version"] === PHP_VERSION && strtotime($info["built_at"]) ? "ok" : "bad";
+  $tags_ok = is_array($info["tags"]) && (!$info["tags"] || in_array(PHP_VERSION, $info["tags"], true));
+  echo $info["php_version"] === PHP_VERSION && strtotime($info["built_at"]) && $tags_ok ? "ok" : "bad";
 ')" = "ok" ] || fail "build info invalid: $INFO"
 pass "build info: $(echo "$INFO" | tr -d '\n ')"
 
