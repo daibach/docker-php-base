@@ -4,7 +4,7 @@
 # a JSON array of {name, last_pulled, action, reason}, newest first. Within
 # each minor version the newest KEEP tags are kept, as is the current version
 # in versions.json and any tag pulled in the last PULL_DAYS days. Other tags
-# (X.Y, legacy variants) are never pruned.
+# (X.Y, retired variants) are never pruned.
 set -eu
 
 KEEP=${KEEP:-3}
