@@ -24,7 +24,6 @@ jobs:
     name: Build matrix
     runs-on: ubuntu-latest
     outputs:
-      include: ${{ steps.matrix.outputs.include }}
       fpm-versions: ${{ steps.fpm-matrix.outputs.fpm-versions }}
       fpm-builds: ${{ steps.fpm-matrix.outputs.fpm-builds }}
       build-date: ${{ steps.build-date.outputs.build-date }}
@@ -32,27 +31,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # One entry per PHP version in versions.json and legacy variant
-      - name: Generate matrix
-        id: matrix
-        run: |
-          include=$(jq -c '
-            [ to_entries[] as $php
-              | ( {variant: "apache", base: "apache"},
-                  {variant: "apache-cron", base: "apache"} )
-              | . + {version: $php.value, tag: "\($php.key)-\(.variant)"} ]
-          ' versions.json)
-          echo "include=${include}" >> "$GITHUB_OUTPUT"
-          echo "${include}" | jq .
-
       # Recorded in the FPM image's build info. Set once so every
       # architecture of a build has the same date.
       - name: Build date
         id: build-date
         run: echo "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      # FPM image: one entry per PHP version that gets it, built natively for
-      # each architecture
+      # One entry per PHP version and architecture, each built natively
       - name: Generate FPM matrix
         id: fpm-matrix
         run: |
@@ -66,56 +51,6 @@ jobs:
           echo "fpm-versions=${versions}" >> "$GITHUB_OUTPUT"
           echo "fpm-builds=${builds}" >> "$GITHUB_OUTPUT"
           echo "${builds}" | jq .
-
-  # Legacy mod_php images
-  build:
-    name: ${{ matrix.tag }}
-    needs: matrix
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.matrix.outputs.include) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Image metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.IMAGE }}
-          tags: type=raw,value=${{ matrix.tag }}
-
-      # Built into the local Docker engine so the image that is tested is
-      # exactly the image that is pushed.
-      - name: Build
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: legacy
-          target: ${{ matrix.variant }}
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
-            BASE_TYPE=${{ matrix.base }}
-          pull: true
-          load: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Smoke test
-        run: tests/smoke-test.sh "${IMAGE}:${{ matrix.tag }}" "${{ matrix.version }}"
-
-      - name: Push
-        if: github.event_name != 'pull_request'
-        run: docker push "${IMAGE}:${{ matrix.tag }}"
 
   # FPM image, per PHP version and architecture. Outside pull requests the
   # image is pushed by digest only (no tag), then that exact digest is pulled
@@ -272,13 +207,12 @@ jobs:
   # which PHP versions are in the matrix.
   result:
     name: Build result
-    needs: [build, fpm-build, fpm-publish]
+    needs: [fpm-build, fpm-publish]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check all builds passed
         run: |
-          test "${{ needs.build.result }}" = "success"
           test "${{ needs.fpm-build.result }}" = "success"
           # Publishing is skipped on pull requests
           case "${{ needs.fpm-publish.result }}" in
