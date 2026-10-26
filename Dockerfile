@@ -96,11 +96,13 @@ RUN set -eux; \
 ARG BUILD_DATE
 ARG BUILD_REVISION
 ARG BUILD_URL
+ARG BUILD_TAGS
 RUN set -eux; \
     mkdir -p /etc/php-parent; \
     BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" php -r ' \
       echo json_encode([ \
         "image" => "cedyrn/php-parent", \
+        "tags" => array_values(array_filter(explode(",", (string) getenv("BUILD_TAGS")))), \
         "php_version" => PHP_VERSION, \
         "debian_version" => trim(file_get_contents("/etc/debian_version")), \
         "architecture" => getenv("TARGETARCH"), \

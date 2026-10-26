@@ -81,6 +81,7 @@ Executable files in `/docker-entrypoint.d/` are run in name order, as root, befo
 ```json
 {
     "image": "cedyrn/php-parent",
+    "tags": ["8.4.27", "8.4"],
     "php_version": "8.4.27",
     "debian_version": "13.7",
     "architecture": "amd64",
@@ -101,7 +102,9 @@ $health['base_image'] = [
 ];
 ```
 
-Alerting on `age_days` (e.g. over 14) finds apps that haven't been rebuilt since the base image was updated. On a public endpoint, consider leaving out version numbers. `source_revision` and `build_url` are empty for local builds. The legacy images don't have this file.
+Alerting on `age_days` (e.g. over 14) finds apps that haven't been rebuilt since the base image was updated. On a public endpoint, consider leaving out version numbers.
+
+`tags` lists the tags the image was published under, not the tag an app's `FROM` used, and isn't updated when a tag moves on: an image built as `8.4.27` still lists `8.4` after `8.4` points at a newer build. `tags` is empty, and `source_revision` and `build_url` are null, for local builds. The legacy images don't have this file.
 
 ### Configuration
 
