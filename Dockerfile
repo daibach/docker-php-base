@@ -19,7 +19,7 @@ ARG SUPERCRONIC_VERSION=0.2.51
 ARG SUPERCRONIC_AMD64_SHA256=cc232108374e8e2b537045f2d5eaa1229f619db314c3ba6a14d38b35dc0aa123
 ARG SUPERCRONIC_ARM64_SHA256=4ae22576a78223d8ccdf5f3b3660a5cbb5288416bf0ca96afc4a36d195932b94
 
-COPY --from=mlocati/php-extension-installer:2.12.6 /usr/bin/install-php-extensions /usr/local/bin/
+COPY --from=mlocati/php-extension-installer:2.13.1 /usr/bin/install-php-extensions /usr/local/bin/
 COPY --from=composer:2.10.3 /usr/bin/composer /usr/local/bin/composer
 
 # s6-overlay (process supervision) and supercronic (cron)
