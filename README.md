@@ -5,7 +5,7 @@ Base PHP images published to Docker Hub as `cedyrn/php-parent`.
 | Tags | Image |
 |---|---|
 | `8.4.27`, `8.4`, `8.5.12`, `8.5` | **PHP-FPM image** (`Dockerfile`): PHP-FPM behind Apache, with cron via supercronic. amd64 and arm64. Use this for new work. |
-| `8.x-apache`, `8.x-apache-cron` | **Legacy images** (`legacy/Dockerfile`): mod_php. To be retired once all apps have moved to the PHP-FPM image. See [docs/MIGRATING.md](docs/MIGRATING.md). The `8.3-*` and `*-cli` tags are no longer rebuilt. |
+| `8.x-apache`, `8.x-apache-cron`, `8.x-cli` | **Retired** mod_php images. No longer rebuilt and will be deleted; move to the PHP-FPM image with [docs/MIGRATING.md](docs/MIGRATING.md). |
 
 Use the exact version tag (e.g. `cedyrn/php-parent:8.4.27`) in application Dockerfiles, so builds never pick up a stale cached copy of a moving tag.
 
@@ -104,7 +104,7 @@ $health['base_image'] = [
 
 Alerting on `age_days` (e.g. over 14) finds apps that haven't been rebuilt since the base image was updated. On a public endpoint, consider leaving out version numbers.
 
-`tags` lists the tags the image was published under, not the tag an app's `FROM` used, and isn't updated when a tag moves on: an image built as `8.4.27` still lists `8.4` after `8.4` points at a newer build. `tags` is empty, and `source_revision` and `build_url` are null, for local builds. The legacy images don't have this file.
+`tags` lists the tags the image was published under, not the tag an app's `FROM` used, and isn't updated when a tag moves on: an image built as `8.4.27` still lists `8.4` after `8.4` points at a newer build. `tags` is empty, and `source_revision` and `build_url` are null, for local builds.
 
 ### Configuration
 
@@ -149,10 +149,8 @@ Add PHP extensions in an app's Dockerfile with `RUN install-php-extensions redis
 
 Images are always built from the exact upstream tag (e.g. `php:8.4.27-fpm`), never the moving `php:8.4-fpm` tag, which can lag behind new releases.
 
-- **Add a PHP version:** add a line to `versions.json` with its latest patch version. All images for it are built automatically.
+- **Add a PHP version:** add a line to `versions.json` with its latest patch version. Its image is built automatically.
 - **Drop a PHP version:** remove its line. Its existing tags stay on Docker Hub but are no longer rebuilt.
-
-The PHP-FPM image is built for versions from `FPM_MIN_VERSION` in `.github/scripts/fpm-versions.sh` (currently 8.4). The legacy images are built for every version.
 
 ### Updates
 
@@ -207,7 +205,7 @@ Each PHP patch release adds a new `X.Y.Z` tag. `.github/workflows/prune.yml` run
 - the newest 3 patch tags, so a dropped minor version keeps its last releases
 - any tag pulled in the last 30 days, so apps pinned to an older version can still be rebuilt
 
-Scheduled runs never delete anything. To delete the listed tags, run Actions → Prune tags → Run workflow from `main` with **apply** ticked. Only `X.Y.Z` tags are pruned; `X.Y` and legacy tags are deleted by hand when retired.
+Scheduled runs never delete anything. To delete the listed tags, run Actions → Prune tags → Run workflow from `main` with **apply** ticked. Only `X.Y.Z` tags are pruned; `X.Y` and retired tags are deleted by hand.
 
 Check the plan locally with `.github/scripts/hub-tags.sh cedyrn/php-parent | .github/scripts/prune-plan.sh` (`KEEP` and `PULL_DAYS` change the limits).
 
@@ -215,18 +213,14 @@ Deleting a tag leaves its image untagged, as does every rebuild of an existing t
 
 ### Tests
 
-`tests/fpm-smoke-test.sh` tests the PHP-FPM image and `tests/smoke-test.sh` the legacy images. Both can be run locally against a built image:
+`tests/fpm-smoke-test.sh` tests the PHP-FPM image. It can be run locally against a built image:
 
 ```sh
 docker build -t php-parent-test:8.4 --build-arg PHP_VERSION=8.4.27 .
 tests/fpm-smoke-test.sh php-parent-test:8.4 8.4.27
-
-docker build -t php-parent-test:8.4-apache --target apache \
-  --build-arg PHP_VERSION=8.4.27 --build-arg BASE_TYPE=apache legacy
-tests/smoke-test.sh php-parent-test:8.4-apache 8.4.27
 ```
 
-The optional second argument checks the PHP version. The FPM tests use port 8080 on the host, or `SMOKE_PORT`. The legacy script selects Apache tests when the image name contains `apache`.
+The optional second argument checks the PHP version. The tests use port 8080 on the host, or `SMOKE_PORT`.
 
 ### Configuration
 
