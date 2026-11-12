@@ -93,18 +93,40 @@ RUN set -eux; \
 
 # Describes this build, for apps to report (e.g. in a health check endpoint).
 # Last, so a new build date doesn't invalidate the cache of earlier layers.
+# Debian packages are listed with their package version (which changes for
+# security fixes) and the upstream version (2.4.65-1~deb13u1 -> 2.4.65).
 ARG BUILD_DATE
 ARG BUILD_REVISION
 ARG BUILD_URL
 ARG BUILD_TAGS
 RUN set -eux; \
     mkdir -p /etc/php-parent; \
+    deb_version() { \
+      dpkg-query -W -f='${db:Status-Abbrev} ${source:Package} ${Version}\n' \
+        | awk -v src="$1" '$1 == "ii" && $2 == src { print $3; exit }'; \
+    }; \
+    APACHE_PACKAGE="$(deb_version apache2)"; \
+    OPENSSL_PACKAGE="$(deb_version openssl)"; \
+    COMPOSER_VERSION="$(COMPOSER_ALLOW_SUPERUSER=1 composer --version --no-ansi 2>/dev/null \
+      | sed -n 's/^Composer version \([^ ]*\).*/\1/p')"; \
+    for v in "$APACHE_PACKAGE" "$OPENSSL_PACKAGE" "$COMPOSER_VERSION" "$S6_OVERLAY_VERSION" "$SUPERCRONIC_VERSION"; do \
+      [ -n "$v" ] || { echo "Missing component version" >&2; exit 1; }; \
+    done; \
+    export APACHE_PACKAGE OPENSSL_PACKAGE COMPOSER_VERSION; \
     BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" php -r ' \
+      $upstream = fn ($package) => preg_replace("/^\d+:|-[^-]*$/", "", $package); \
       echo json_encode([ \
         "image" => "cedyrn/php-parent", \
         "tags" => array_values(array_filter(explode(",", (string) getenv("BUILD_TAGS")))), \
         "php_version" => PHP_VERSION, \
         "debian_version" => trim(file_get_contents("/etc/debian_version")), \
+        "components" => [ \
+          "apache" => ["version" => $upstream(getenv("APACHE_PACKAGE")), "package" => getenv("APACHE_PACKAGE")], \
+          "openssl" => ["version" => $upstream(getenv("OPENSSL_PACKAGE")), "package" => getenv("OPENSSL_PACKAGE")], \
+          "composer" => ["version" => getenv("COMPOSER_VERSION")], \
+          "s6-overlay" => ["version" => getenv("S6_OVERLAY_VERSION")], \
+          "supercronic" => ["version" => getenv("SUPERCRONIC_VERSION")], \
+        ], \
         "architecture" => getenv("TARGETARCH"), \
         "built_at" => getenv("BUILD_DATE"), \
         "source_revision" => getenv("BUILD_REVISION") ?: null, \
