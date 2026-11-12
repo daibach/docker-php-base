@@ -84,6 +84,13 @@ Executable files in `/docker-entrypoint.d/` are run in name order, as root, befo
     "tags": ["8.4.27", "8.4"],
     "php_version": "8.4.27",
     "debian_version": "13.7",
+    "components": {
+        "apache": { "version": "2.4.69", "package": "2.4.69-1~deb13u1" },
+        "openssl": { "version": "3.5.7", "package": "3.5.7-1~deb13u3" },
+        "composer": { "version": "2.11.1" },
+        "s6-overlay": { "version": "3.2.3.2" },
+        "supercronic": { "version": "0.2.51" }
+    },
     "architecture": "amd64",
     "built_at": "2026-10-23T10:51:26Z",
     "source_revision": "d04c230f...",
@@ -103,6 +110,8 @@ $health['base_image'] = [
 ```
 
 Alerting on `age_days` (e.g. over 14) finds apps that haven't been rebuilt since the base image was updated. On a public endpoint, consider leaving out version numbers.
+
+Every component has a `version`. Apache and OpenSSL come from Debian, so they also have the Debian `package` version: Debian backports security fixes without changing the upstream version, so `package` is the one to compare with security advisories and scanner reports.
 
 `tags` lists the tags the image was published under, not the tag an app's `FROM` used, and isn't updated when a tag moves on: an image built as `8.4.27` still lists `8.4` after `8.4` points at a newer build. `tags` is empty, and `source_revision` and `build_url` are null, for local builds.
 

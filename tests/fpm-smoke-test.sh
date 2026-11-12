@@ -102,8 +102,13 @@ INFO=$(run cat /etc/php-parent/build.json) || fail "build info missing"
 [ "$(run php -r '
   $info = json_decode(file_get_contents("/etc/php-parent/build.json"), true);
   $tags_ok = is_array($info["tags"]) && (!$info["tags"] || in_array(PHP_VERSION, $info["tags"], true));
-  echo $info["php_version"] === PHP_VERSION && strtotime($info["built_at"]) && $tags_ok ? "ok" : "bad";
+  $components_ok = count($info["components"]) === 5
+    && !array_filter($info["components"], fn ($c) => empty($c["version"]));
+  echo $info["php_version"] === PHP_VERSION && strtotime($info["built_at"]) && $tags_ok && $components_ok ? "ok" : "bad";
 ')" = "ok" ] || fail "build info invalid: $INFO"
+apache_version=$(run apache2 -v | sed -n 's|^Server version: Apache/\([0-9.]*\).*|\1|p')
+[ -n "$apache_version" ] && echo "$INFO" | grep -q "\"version\": \"$apache_version\"" \
+  || fail "build info Apache version doesn't match apache2 -v ($apache_version)"
 pass "build info: $(echo "$INFO" | tr -d '\n ')"
 
 echo "== Commands"
