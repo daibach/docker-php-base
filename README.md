@@ -2,9 +2,9 @@
 
 Base PHP images published to Docker Hub as `cedyrn/php-parent`.
 
-| Tags | Image |
-|---|---|
-| `8.4.27`, `8.4`, `8.5.12`, `8.5` | **PHP-FPM image** (`Dockerfile`): PHP-FPM behind Apache, with cron via supercronic. amd64 and arm64. Use this for new work. |
+| Tags                                       | Image |
+|--------------------------------------------|---|
+| `8.4.28`, `8.4`, `8.5.13`, `8.5`           | **PHP-FPM image** (`Dockerfile`): PHP-FPM behind Apache, with cron via supercronic. amd64 and arm64. Use this for new work. |
 | `8.x-apache`, `8.x-apache-cron`, `8.x-cli` | **Retired** mod_php images. No longer rebuilt and will be deleted; move to the PHP-FPM image with [docs/MIGRATING.md](docs/MIGRATING.md). |
 
 Use the exact version tag (e.g. `cedyrn/php-parent:8.4.27`) in application Dockerfiles, so builds never pick up a stale cached copy of a moving tag.
@@ -31,7 +31,7 @@ The container's command selects what runs:
 | anything else, e.g. `php spark migrate` | that command, directly | `root`, unless the app's Dockerfile sets `USER` |
 
 ```dockerfile
-FROM cedyrn/php-parent:8.4.27
+FROM cedyrn/php-parent:8.4.28
 COPY crontab /etc/supercronic/crontab
 CMD ["web", "cron"]
 ```
